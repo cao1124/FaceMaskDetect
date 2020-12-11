@@ -130,14 +130,6 @@ def run_on_video(video_path, output_video_name, conf_thresh):
 
             # 切割人脸
             person_face = np.zeros((80, img_raw.shape[1], 3))
-            if len(output_info) > 1:
-                for i in range(len(output_info)):
-                    face = img_raw[output_info[i][3]: output_info[i][5], output_info[i][2]:output_info[i][4], :]
-                    person_face[0:80, 80*i:80*(i+1), :] = cv2.resize(face, (80, 80))
-            elif len(output_info) == 1:
-                face = img_raw[output_info[0][3]: output_info[0][5], output_info[0][2]:output_info[0][4], :]
-                person_face[0:80, 0:80, :] = cv2.resize(face, (80, 80))
-            # cv2.imwrite('person_face.jpg', person_face)
 
             # 增加logo显示 结果显示
             logo = cv2.imread('img/gdpacs_logo.jpg')
@@ -149,6 +141,14 @@ def run_on_video(video_path, output_video_name, conf_thresh):
                 # 发现未带口罩，warning提醒
                 img_raw = add_chinese_text(img_raw, '总人数：' + str(len(counter)) + '未戴口罩人数：'
                                            + str(Counter(counter).get(1)), 0, 20, (255, 0, 0), )
+                if len(output_info) > 1:
+                    for i in range(len(output_info)):
+                        face = img_raw[output_info[i][3]: output_info[i][5], output_info[i][2]:output_info[i][4], :]
+                        person_face[0:80, 80 * i:80 * (i + 1), :] = cv2.resize(face, (80, 80))
+                elif len(output_info) == 1:
+                    face = img_raw[output_info[0][3]: output_info[0][5], output_info[0][2]:output_info[0][4], :]
+                    person_face[0:80, 0:80, :] = cv2.resize(face, (80, 80))
+                # cv2.imwrite('person_face.jpg', person_face)
                 if idx % 24 == 0:
                     mixer.music.load('warning.wav')
                     mixer.music.play()

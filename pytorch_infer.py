@@ -122,11 +122,26 @@ def run_on_video(video_path, output_video_name, conf_thresh):
                       target_shape=(360, 360),
                       draw_result=True,
                       show_result=False)
+            # print(output_info)
+            # output_info.append([class_id, conf, xmin, ymin, xmax, ymax])
+            # output_info = [[0, 0.9998568296432495, 32, 281, 292, 480], [0, 0.8335195779800415, 379, 179, 414, 216]]
             # id2class = {0: 'Mask', 1: 'NoMask'} #
             counter = [x[0] for x in output_info]
+
+            # 切割人脸
+            person_face = np.zeros((80, img_raw.shape[1], 3))
+            if len(output_info) > 1:
+                for i in range(len(output_info)):
+                    face = img_raw[output_info[i][3]: output_info[i][5], output_info[i][2]:output_info[i][4], :]
+                    person_face[0:80, 80*i:80*(i+1), :] = cv2.resize(face, (80, 80))
+            elif len(output_info) == 1:
+                face = img_raw[output_info[0][3]: output_info[0][5], output_info[0][2]:output_info[0][4], :]
+                person_face[0:80, 0:80, :] = cv2.resize(face, (80, 80))
+            # cv2.imwrite('person_face.jpg', person_face)
+
             # 增加logo显示 结果显示
             logo = cv2.imread('img/gdpacs_logo.jpg')
-            img_raw[img_raw.shape[0]-logo.shape[0]:img_raw.shape[0], img_raw.shape[1]-logo.shape[1]:img_raw.shape[1]] = logo[:, :, ::-1]
+            person_face[0: 80, 560: 640, :] = cv2.resize(logo[:, :, ::-1], (80, 80))
             if Counter(counter).get(1) == None:
                 img_raw = add_chinese_text(img_raw, '总人数：' + str(len(counter))
                                            + '未戴口罩人数：' + str(0), 0, 20, (0, 0, 255),)
@@ -139,7 +154,8 @@ def run_on_video(video_path, output_video_name, conf_thresh):
                     mixer.music.play()
                 idx += 1
                 cv2.waitKey(5)
-            cv2.imshow('GD_FaceMaskDetect', img_raw[:, :, ::-1])
+            img_out = np.concatenate((img_raw, person_face), axis=0).astype(np.uint8)
+            cv2.imshow('GD_FaceMaskDetect', img_out[:, :, ::-1])
             cv2.waitKey(5)
 
             # 输出保存录像

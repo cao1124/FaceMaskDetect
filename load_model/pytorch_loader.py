@@ -1,10 +1,12 @@
 import sys
 import torch
-sys.path.append('models/')
+sys.path.append('models\\')
+
 
 def load_pytorch_model(model_path):
     model = torch.load(model_path)
     return model
+
 
 def pytorch_inference(model, img_arr):
     if torch.cuda.is_available():

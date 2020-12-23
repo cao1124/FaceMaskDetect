@@ -1,6 +1,7 @@
 # -*- coding:utf-8 -*-
 import numpy as np
 
+
 def decode_bbox(anchors, raw_outputs, variances=[0.1, 0.1, 0.2, 0.2]):
     '''
     Decode the actual bbox according to the anchors.

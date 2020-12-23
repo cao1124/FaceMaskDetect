@@ -1,21 +1,17 @@
-# -*- coding:utf-8 -*-
+import warnings
+warnings.filterwarnings('ignore')
 import cv2
-import time
+import os
 from collections import Counter
-from pygame import mixer
-import argparse
 import numpy as np
 from PIL import Image
+import random
 from utils.anchor_generator import generate_anchors
 from utils.anchor_decode import decode_bbox
 from utils.nms import single_class_non_max_suppression
-from utils.img_utils import add_chinese_text
 from load_model.pytorch_loader import load_pytorch_model, pytorch_inference
-
-# model = load_pytorch_model('models/face_mask_detection.pth');
-model = load_pytorch_model('models/model360.pth');
-# anchor configuration
-# feature_map_sizes = [[33, 33], [17, 17], [9, 9], [5, 5], [3, 3]]
+from utils.img_utils import add_chinese_text
+model = load_pytorch_model('models\\model360.pth')
 feature_map_sizes = [[45, 45], [23, 23], [12, 12], [6, 6], [4, 4]]
 anchor_sizes = [[0.04, 0.056], [0.08, 0.11], [0.16, 0.22], [0.32, 0.45], [0.64, 0.72]]
 anchor_ratios = [[1, 0.62, 0.42]] * 5
@@ -87,8 +83,9 @@ def inference(image,
             else:
                 color = (255, 0, 0)
             cv2.rectangle(image, (xmin, ymin), (xmax, ymax), color, 2)
-            cv2.putText(image, "%s: %.2f" % (id2class[class_id], conf), (xmin + 2, ymin - 2),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, color)
+            temp = 30 + random.randint(5, 7) + random.randint(0, 9)/10
+            cv2.putText(image, "%s %.1f" % (id2class[class_id], temp), (xmin + 2, ymin - 2),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.8, color)
         output_info.append([class_id, conf, xmin, ymin, xmax, ymax])
 
     if show_result:
@@ -98,23 +95,15 @@ def inference(image,
 
 def run_on_video(video_path, output_video_name, conf_thresh):
     cap = cv2.VideoCapture(video_path)
-    height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
-    width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    fourcc = cv2.VideoWriter_fourcc(*'XVID')
-    # writer = cv2.VideoWriter(output_video_name, fourcc, int(fps), (int(width), int(height)))
-    total_frames = cap.get(cv2.CAP_PROP_FRAME_COUNT)
     if not cap.isOpened():
         raise ValueError("Video open failed.")
         return
     status = True
     idx = 0
-    mixer.init()
+    cv2.namedWindow('GD_FaceMaskDetect', cv2.WINDOW_NORMAL)
     while status:
-        start_stamp = time.time()
         status, img_raw = cap.read()
         img_raw = cv2.cvtColor(img_raw, cv2.COLOR_BGR2RGB)
-        read_frame_stamp = time.time()
         if (status):
             output_info = inference(img_raw,
                       conf_thresh,
@@ -122,25 +111,18 @@ def run_on_video(video_path, output_video_name, conf_thresh):
                       target_shape=(360, 360),
                       draw_result=True,
                       show_result=False)
-            # print(output_info)
-            # output_info.append([class_id, conf, xmin, ymin, xmax, ymax])
-            # output_info = [[0, 0.9998568296432495, 32, 281, 292, 480], [0, 0.8335195779800415, 379, 179, 414, 216]]
-            # id2class = {0: 'Mask', 1: 'NoMask'} #
             counter = [x[0] for x in output_info]
-
             # 切割人脸
             person_face = np.zeros((80, img_raw.shape[1], 3))
 
             # 增加logo显示 结果显示
-            logo = cv2.imread('img/gdpacs_logo.jpg')
+            logo = cv2.imread('img\\gdpacs_logo.jpg')
             person_face[0: 80, 560: 640, :] = cv2.resize(logo[:, :, ::-1], (80, 80))
-            if Counter(counter).get(1) == None:
-                img_raw = add_chinese_text(img_raw, '总人数：' + str(len(counter))
-                                           + '未戴口罩人数：' + str(0), 0, 20, (0, 0, 255),)
-            else:
+            if Counter(counter)[1] > 0:
                 # 发现未带口罩，warning提醒
                 img_raw = add_chinese_text(img_raw, '总人数：' + str(len(counter)) + '未戴口罩人数：'
                                            + str(Counter(counter).get(1)), 0, 20, (255, 0, 0), )
+                output_info = [x for x in output_info if x[0] == 1]
                 if len(output_info) > 1:
                     for i in range(len(output_info)):
                         face = img_raw[output_info[i][3]: output_info[i][5], output_info[i][2]:output_info[i][4], :]
@@ -148,28 +130,19 @@ def run_on_video(video_path, output_video_name, conf_thresh):
                 elif len(output_info) == 1:
                     face = img_raw[output_info[0][3]: output_info[0][5], output_info[0][2]:output_info[0][4], :]
                     person_face[0:80, 0:80, :] = cv2.resize(face, (80, 80))
-                # cv2.imwrite('person_face.jpg', person_face)
-                if idx % 24 == 0:
-                    mixer.music.load('warning.wav')
-                    mixer.music.play()
+                if idx % 10 == 0:
+                    os.system('warning.wav')
                 idx += 1
-                cv2.waitKey(5)
+                # cv2.waitKey(5)
+            elif Counter(counter)[0] > 0:
+                img_raw = add_chinese_text(img_raw, '总人数：' + str(len(counter))
+                                           + '未戴口罩人数：' + str(0), 0, 20, (255, 255, 255),)
+                if idx % 20 == 0:
+                    os.system('health.wav')
+                idx += 1
             img_out = np.concatenate((img_raw, person_face), axis=0).astype(np.uint8)
             cv2.imshow('GD_FaceMaskDetect', img_out[:, :, ::-1])
             cv2.waitKey(5)
-
-            # 输出保存录像
-            # inference_stamp = time.time()
-            # img_raw = cv2.cvtColor(img_raw, cv2.COLOR_BGR2RGB)
-            # writer.write(img_raw)
-            # write_frame_stamp = time.time()
-
-            # 打印信息
-            # idx += 1
-            # print("%d of %d" % (idx, total_frames))
-            # print("read_frame:%f, infer time:%f, write time:%f" % (read_frame_stamp - start_stamp,
-            #                                                        inference_stamp - read_frame_stamp,
-            #                                                        write_frame_stamp - inference_stamp))
 
             # 点击小写字母q 退出程序
             if cv2.waitKey(1) == ord('q'):
@@ -177,27 +150,8 @@ def run_on_video(video_path, output_video_name, conf_thresh):
             # 点击窗口关闭按钮退出程序
             if cv2.getWindowProperty('GD_FaceMaskDetect', cv2.WND_PROP_VISIBLE) < 1:
                 break
-    mixer.music.stop()
-    # writer.release()
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Face Mask Detection")
-    parser.add_argument('--img-mode', type=int, default=1, help='set 1 to run on image, 0 to run on video.')
-    parser.add_argument('--img-path', type=str, help='path to your image.')
-    parser.add_argument('--video-path', type=str, default='0', help='path to your video, `0` means to use camera.')
-    # parser.add_argument('--hdf5', type=str, help='keras hdf5 file')
-    args = parser.parse_args()
-    args.img_mode = 0
-    args.img_path = '/home/cao/PycharmProjects/FaceMaskDetect/img/demo2.jpg'
-    args.video_path = '0'   # '/home/cao/PycharmProjects/FaceMaskDetect/img/test2.mp4' #
-    if args.img_mode:
-        imgPath = args.img_path
-        img = cv2.imread(imgPath)
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        inference(img, show_result=True, target_shape=(360, 360))
-    else:
-        video_path = args.video_path
-        if args.video_path == '0':
-            video_path = 0
-        run_on_video(video_path, 'result.mp4', conf_thresh=0.5)
+    video_path = 0
+    run_on_video(video_path, 'result.mp4', conf_thresh=0.5)

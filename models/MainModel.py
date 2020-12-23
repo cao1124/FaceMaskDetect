@@ -2,9 +2,9 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import math
 
 __weights_dict = dict()
+
 
 def load_weights(weight_file):
     if weight_file == None:
@@ -16,6 +16,7 @@ def load_weights(weight_file):
         weights_dict = np.load(weight_file, encoding='bytes').item()
 
     return weights_dict
+
 
 class KitModel(nn.Module):
 
@@ -191,38 +192,3 @@ class KitModel(nn.Module):
         loc_branch_concat = torch.cat((loc_0_reshape, loc_1_reshape, loc_2_reshape, loc_3_reshape, loc_4_reshape), 1)
         cls_branch_concat = torch.cat((cls_0_activation, cls_1_activation, cls_2_activation, cls_3_activation, cls_4_activation), 1)
         return loc_branch_concat, cls_branch_concat
-
-
-    @staticmethod
-    def __batch_normalization(dim, name, **kwargs):
-        if   dim == 0 or dim == 1:  layer = nn.BatchNorm1d(**kwargs)
-        elif dim == 2:  layer = nn.BatchNorm2d(**kwargs)
-        elif dim == 3:  layer = nn.BatchNorm3d(**kwargs)
-        else:           raise NotImplementedError()
-
-        if 'scale' in __weights_dict[name]:
-            layer.state_dict()['weight'].copy_(torch.from_numpy(__weights_dict[name]['scale']))
-        else:
-            layer.weight.data.fill_(1)
-
-        if 'bias' in __weights_dict[name]:
-            layer.state_dict()['bias'].copy_(torch.from_numpy(__weights_dict[name]['bias']))
-        else:
-            layer.bias.data.fill_(0)
-
-        layer.state_dict()['running_mean'].copy_(torch.from_numpy(__weights_dict[name]['mean']))
-        layer.state_dict()['running_var'].copy_(torch.from_numpy(__weights_dict[name]['var']))
-        return layer
-
-    @staticmethod
-    def __conv(dim, name, **kwargs):
-        if   dim == 1:  layer = nn.Conv1d(**kwargs)
-        elif dim == 2:  layer = nn.Conv2d(**kwargs)
-        elif dim == 3:  layer = nn.Conv3d(**kwargs)
-        else:           raise NotImplementedError()
-
-        layer.state_dict()['weight'].copy_(torch.from_numpy(__weights_dict[name]['weights']))
-        if 'bias' in __weights_dict[name]:
-            layer.state_dict()['bias'].copy_(torch.from_numpy(__weights_dict[name]['bias']))
-        return layer
-
